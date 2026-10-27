@@ -2,6 +2,15 @@
 
 给自己的域名做一个「收件口」：**任何发到 `*@你的域名` 的邮件都被收下来**，打开网页就能看，验证码自动提取高亮。零依赖，单进程，Node 18+ 直接跑。
 
+## 软件版（Windows，双击即用）
+
+不想装 Node？直接下便携包：[Release v0.2.0 · catchmail-portable-win-x64.zip](https://github.com/qzzxqzzx/catchmail/releases/download/v0.2.0/catchmail-portable-win-x64.zip)（约 35MB）
+
+- 解压后双击 `catchmail.exe`：首跑自动生成 `config.json`，自动打开浏览器收件箱
+- 把 `config.json` 里 `domains` 改成你的域名并重启，即完成配置
+- `注册开机自启.bat` = 登录后自动最小化启动；重复双击 exe 会自动打开已运行实例的页面
+- 自己构建：`npm run dist`（测试 + esbuild 单文件 + Node SEA 注入 + zip），产物在 `dist/`
+
 ```
 发件方 ──SMTP──▶ catchmail(25端口) ──▶ data/messages.jsonl（追加落盘）
                                         ▲
