@@ -1,0 +1,27 @@
+catchmail · 域名邮箱接收器（便携版）
+=====================================
+
+【快速开始】
+1. 双击 catchmail.exe
+   - 首次运行会自动生成 config.json（记事本打开，把 domains 里的 example.com 改成你的域名，保存后重启程序）
+   - 启动后会自动打开浏览器收件箱（http://127.0.0.1:8025）
+2. 关闭黑色控制台窗口 = 停止收信
+3. 日志在 data\catchmail.log；所有邮件原文在 data\raw\
+
+【真正收到你域名的邮件】（需要一台 25 端口放行的 Windows/Linux 服务器）
+1. 把整个文件夹放到服务器上
+2. config.json：domains 改成你的域名；Windows 上 smtpPort 保持 25；Linux 上用源码 + systemd 更稳（见仓库 README）
+3. DNS 添加：MX 记录 → 服务器 IP；TXT(SPF)：v=spf1 mx ~all
+4. 完成。任何发到 任意前缀@你域名 的信都会进收件箱，按前缀自动分箱
+
+【开机自启】
+- 双击「注册开机自启.bat」（登录后自动最小化启动）
+- 不想要了双击「取消开机自启.bat」
+
+【常见问题】
+- 提示端口被占用：可能已经开着一个 catchmail（它会自动帮你打开已运行实例的页面）；
+  或改 config.json 里的 httpPort / smtpPort
+- 收不到信：先看控制台/日志有没有「收信」字样；再查 DNS MX 是否生效（nslookup -type=mx 你的域名）
+- 验证码没被提取：只有中英文常见格式会自动识别，正文里一定能找到原始邮件
+
+开源与源码：https://github.com/qzzxqzzx/catchmail

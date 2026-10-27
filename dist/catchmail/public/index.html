@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>catchmail · 域名收件箱</title>
+<style>
+  :root { --bg:#0f1115; --panel:#171a21; --line:#232833; --fg:#d7dce4; --dim:#8a93a6; --acc:#4f9cf9; --code:#ffb454; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.6 system-ui,"Segoe UI","Microsoft YaHei",sans-serif; height:100vh; display:flex; flex-direction:column; }
+  header { display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid var(--line); background:var(--panel); }
+  header h1 { font-size:16px; margin:0; color:var(--acc); }
+  header input { flex:0 1 320px; background:var(--bg); border:1px solid var(--line); color:var(--fg); padding:6px 10px; border-radius:6px; }
+  header .dot { margin-left:auto; font-size:12px; color:var(--dim); }
+  main { flex:1; display:grid; grid-template-columns: 200px 380px 1fr; min-height:0; }
+  .boxes { border-right:1px solid var(--line); overflow:auto; padding:8px; }
+  .box-item { padding:6px 10px; border-radius:6px; cursor:pointer; display:flex; justify-content:space-between; color:var(--dim); }
+  .box-item:hover { background:var(--panel); color:var(--fg); }
+  .box-item.on { background:var(--panel); color:var(--acc); }
+  .list { border-right:1px solid var(--line); overflow:auto; }
+  .msg { padding:10px 14px; border-bottom:1px solid var(--line); cursor:pointer; }
+  .msg:hover { background:var(--panel); }
+  .msg.on { background:var(--panel); border-left:2px solid var(--acc); }
+  .msg .subj { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .msg .meta { font-size:12px; color:var(--dim); display:flex; gap:8px; overflow:hidden; }
+  .badge { display:inline-block; background:#2a2113; color:var(--code); border:1px solid #4d3b17; border-radius:4px; padding:0 6px; font-family:ui-monospace,Consolas,monospace; }
+  .view { display:flex; flex-direction:column; min-width:0; }
+  .view-head { padding:12px 18px; border-bottom:1px solid var(--line); }
+  .view-head h2 { margin:0 0 6px; font-size:17px; }
+  .view-head .meta { color:var(--dim); font-size:12.5px; }
+  .view-head .ops { margin-top:8px; display:flex; gap:8px; align-items:center; }
+  button { background:var(--panel); color:var(--fg); border:1px solid var(--line); padding:4px 12px; border-radius:6px; cursor:pointer; }
+  button:hover { border-color:var(--acc); color:var(--acc); }
+  button.danger:hover { border-color:#e5484d; color:#e5484d; }
+  .view-body { flex:1; overflow:auto; }
+  iframe { width:100%; height:100%; border:0; background:#fff; }
+  pre.text, pre.raw { white-space:pre-wrap; word-break:break-word; padding:14px 18px; margin:0; font:13px/1.7 ui-monospace,Consolas,monospace; }
+  .empty { color:var(--dim); text-align:center; padding:60px 20px; }
+  .att { font-size:12px; color:var(--dim); margin-top:4px; }
+  @media (max-width:900px){ main{grid-template-columns:150px 1fr} .view{display:none} }
+</style>
+</head>
+<body>
+<header>
+  <h1>📮 catchmail</h1>
+  <input id="q" placeholder="搜索主题 / 发件人 / 正文…">
+  <span class="dot" id="status"></span>
+</header>
+<main>
+  <aside class="boxes" id="boxes"></aside>
+  <section class="list" id="list"></section>
+  <section class="view" id="view"><div class="empty">选择一封邮件查看</div></section>
+</main>
+<script>
+const $ = (s) => document.querySelector(s);
+let cur = { box: '', q: '', id: null, mode: 'html' };
+let timer = null;
+
+async function api(p, opt) { const r = await fetch(p, opt); return r.json(); }
+
+async function refreshBoxes() {
+  const boxes = await api('/api/boxes');
+  $('#boxes').innerHTML = '<div class="box-item ' + (!cur.box ? 'on' : '') + '" data-b="">全部 <span>' +
+    boxes.reduce((s, b) => s + b.count, 0) + '</span></div>' +
+    boxes.map((b) => `<div class="box-item ${cur.box === b.name ? 'on' : ''}" data-b="${b.name}">${b.name} <span>${b.count}</span></div>`).join('');
+  for (const el of document.querySelectorAll('.box-item'))
+    el.onclick = () => { cur.box = el.dataset.b; refreshBoxes(); refreshList(); };
+}
+
+async function refreshList() {
+  const p = new URLSearchParams();
+  if (cur.box) p.set('box', cur.box);
+  if (cur.q) p.set('q', cur.q);
+  const items = await api('/api/messages?' + p);
+  $('#list').innerHTML = items.length ? items.map((m) => `
+    <div class="msg ${cur.id === m.id ? 'on' : ''}" data-id="${m.id}">
+      <div class="subj">${m.code ? `<span class="badge">${m.code}</span> ` : ''}${esc(m.subject)}</div>
+      <div class="meta"><span>${esc(m.from || '?')}</span><span>${esc(m.box)}</span><span>${time(m.ts)}</span></div>
+    </div>`).join('') : '<div class="empty">暂无邮件</div>';
+  for (const el of document.querySelectorAll('.msg'))
+    el.onclick = () => { cur.id = el.dataset.id; openMsg(); refreshList(); };
+  $('#status').textContent = `已连接 · ${items.length} 封 · 每 5s 刷新`;
+}
+
+async function openMsg() {
+  const m = await api('/api/messages/' + cur.id);
+  if (!m || m.error) return;
+  const view = $('#view');
+  const att = m.attachments?.length
+    ? `<div class="att">📎 ${m.attachments.map((a) => `${esc(a.filename)} (${Math.ceil(a.size / 1024)}KB)`).join('、')}</div>` : '';
+  view.innerHTML = `
+    <div class="view-head">
+      <h2>${m.code ? `<span class="badge">${m.code}</span> ` : ''}${esc(m.subject)}</h2>
+      <div class="meta">自 <b>${esc(m.from || m.fromName || '?')}</b> → ${esc(m.to)} · ${esc(m.date || time(m.ts))} · ${m.size}B</div>
+      ${att}
+      <div class="ops">
+        ${m.hasHtml ? '<button data-m="html">网页</button>' : ''}
+        <button data-m="text">文本</button>
+        <button data-m="raw">原文</button>
+        <button class="danger" data-m="del">删除</button>
+      </div>
+    </div>
+    <div class="view-body" id="vbody"><div class="empty">加载中…</div></div>`;
+  for (const b of view.querySelectorAll('button'))
+    b.onclick = async () => {
+      const mode = b.dataset.m;
+      if (mode === 'del') { await api('/api/messages/' + cur.id, { method: 'DELETE' }); cur.id = null; view.innerHTML = '<div class="empty">已删除</div>'; refreshBoxes(); refreshList(); return; }
+      cur.mode = mode; renderBody(m);
+    };
+  cur.mode = m.hasHtml ? 'html' : 'text';
+  renderBody(m);
+}
+
+async function renderBody(m) {
+  const body = $('#vbody');
+  if (cur.mode === 'html' && m.hasHtml) {
+    // 沙箱 iframe：脚本不执行，链接新窗口打开
+    body.innerHTML = '<iframe sandbox="allow-popups" referrerpolicy="no-referrer"></iframe>';
+    body.firstChild.srcdoc = m.html;
+  } else if (cur.mode === 'raw') {
+    const r = await fetch('/api/messages/' + m.id + '/raw');
+    body.innerHTML = '<pre class="raw"></pre>';
+    body.firstChild.textContent = await r.text();
+  } else {
+    body.innerHTML = '<pre class="text"></pre>';
+    body.firstChild.textContent = m.text || '（无文本内容）';
+  }
+}
+
+const esc = (s = '') => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const time = (ts) => new Date(ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+$('#q').oninput = (() => { let t; return (e) => { clearTimeout(t); t = setTimeout(() => { cur.q = e.target.value.trim(); refreshList(); }, 300); }; })();
+
+refreshBoxes(); refreshList();
+clearInterval(timer); timer = setInterval(() => { refreshBoxes(); refreshList(); }, 5000);
+</script>
+</body>
+</html>

@@ -4,11 +4,21 @@
   "description": "域名邮箱接收器：catch-all SMTP 收信 + Web 收件箱 + 验证码自动提取（零依赖）",
   "type": "module",
   "main": "src/server.js",
-  "bin": { "catchmail": "src/server.js" },
+  "bin": {
+    "catchmail": "src/server.js"
+  },
   "scripts": {
     "start": "node src/server.js",
-    "test": "node test/smoke.mjs"
+    "test": "node test/smoke.mjs",
+    "build": "node scripts/build.mjs",
+    "dist": "npm test && npm run build"
   },
-  "engines": { "node": ">=18" },
-  "license": "MIT"
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "postject": "^1.0.0-alpha.6"
+  }
 }

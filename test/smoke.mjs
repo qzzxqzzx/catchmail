@@ -18,7 +18,7 @@ writeFileSync(cfgFile, JSON.stringify({
   maxPerBox: 500,
 }));
 
-const child = spawn(process.execPath, [join(ROOT, 'src/server.js'), '--config=' + cfgFile], { stdio: 'inherit' });
+const child = spawn(process.execPath, [join(ROOT, 'src/server.js'), '--config=' + cfgFile, '--no-open'], { stdio: 'inherit' });
 process.on('exit', () => { try { child.kill(); } catch {} }); // 任何退出路径都清掉子服务
 let ready = false;
 // 就绪探测改走 HTTP 轮询（stdio inherit 后不再解析子进程输出）

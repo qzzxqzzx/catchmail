@@ -1,0 +1,5 @@
+{
+  "main": "dist/app.cjs",
+  "output": "dist/sea.blob",
+  "disableExperimentalSEAWarning": true
+}
