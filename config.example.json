@@ -1,0 +1,10 @@
+{
+  "domains": ["example.com"],
+  "smtpPort": 25,
+  "smtpHost": "0.0.0.0",
+  "httpPort": 8025,
+  "httpHost": "127.0.0.1",
+  "maxMessageBytes": 10485760,
+  "maxPerBox": 500,
+  "dataDir": "data"
+}
